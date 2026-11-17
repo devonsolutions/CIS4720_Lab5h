@@ -278,17 +278,32 @@ SELECT * FROM attendance;
 -- Copy these from the handout and run them.
 -- =================================================================
 
--- your comment goes here
--- your statements go here
-
+-- make a session variable and look at it
+SET @passing = 80;
+SELECT @passing;
+-- use it in a query, anywhere a value could go
+SELECT student_name, test_name, score
+FROM student_scores
+WHERE score < @passing;
+-- a variable nobody ever set
+SELECT @never_set;
+-- put the answer to a query straight into a variable
+SELECT COUNT(*) INTO @how_many FROM students;
+SELECT @how_many;
 
 -- =================================================================
 -- STEP 4. Session variables on your own
 -- =================================================================
 
--- your comment goes here
--- your statements go here
+-- Select the highest score for 'quiz3'
+-- and place result in a variable called @top
+-- RUN select @top as a separate statement
 
+select max(score) into @top from test_scores where test_name = 'quiz3';
+select @top;
+
+-- Create session variable @test. SET to 'quiz3
+-- Call Stored Procedure scores_for_test and pass session v
 
 -- =================================================================
 -- STEP 5. Local variables, class_stats
@@ -296,9 +311,22 @@ SELECT * FROM attendance;
 -- Copy this one from the handout. Then try the SELECT that fails.
 -- =================================================================
 
--- your comment goes here
--- your statements go here
-
+-- three numbers about the whole class, worked out one at a time
+CREATE PROCEDURE class_stats()
+BEGIN
+    -- DECLARE makes a local variable: a name, a type, and a starting value
+    DECLARE v_students INT DEFAULT 0;
+    DECLARE v_scores INT DEFAULT 0;
+    DECLARE v_average DECIMAL(5,2);
+    -- fill the first one
+    SELECT COUNT(*) INTO v_students FROM students;
+    -- one SELECT can fill two variables, in the same order
+    SELECT COUNT(*), ROUND(AVG(score), 2)
+    INTO v_scores, v_average
+    FROM test_scores;
+    -- show all three as one row
+    SELECT v_students AS students, v_scores AS scores, v_average AS class_average;
+END
 
 -- =================================================================
 -- STEP 6. An OUT parameter, count_scores
@@ -306,8 +334,12 @@ SELECT * FROM attendance;
 -- Copy the skeleton and write the SELECT ... INTO.
 -- =================================================================
 
--- your comment goes here
--- your statements go here
+-- counts one student's scores and hands the number back
+CREATE PROCEDURE count_scores(IN p_student_id INT, OUT p_count INT)
+BEGIN
+    -- count this student's rows and put the answer in p_count
+    -- >>>>>  YOUR STATEMENT GOES HERE  <<<<<
+END
 
 
 -- =================================================================
@@ -326,9 +358,46 @@ SELECT * FROM attendance;
 -- Copy the skeleton and write the IF block.
 -- =================================================================
 
--- your comment goes here
--- your statements go here
+-- reports a student's standing as a word, through an OUT parameter
+CREATE PROCEDURE student_standing(IN p_student_id INT,
+                                  OUT p_standing VARCHAR(20))
+BEGIN
+    -- the gpa goes here once we have looked it up
+    DECLARE v_gpa DECIMAL(5,2);
+    -- look it up. no matching student leaves v_gpa NULL
+    SELECT gpa
+    INTO v_gpa
+    FROM students
+    WHERE student_id = p_student_id;
+    -- choose the label
+    IF v_ga IS NULL THEN
+        SET p_standing = "No such student";
+    ELSEIF v_gpa >= 90 THEN
+        SET p_standing = "Honors";
+    ELSEIF v_gpa >= 85 THEN
+        SET p_standing = "Good standing";
+    ELSE
+        SET p_standing = "Needs support";
+    END IF;
+END
+-- Call it for students 7, 3, 1, 4, and 9
+-- each with a SELECT of the OUT variable, run together.
+-- You write these
 
+CALL student_standing(7,@s); -- Honors
+select @s;
+
+CALL student_standing(3,@s); -- Honors
+select @s;
+
+CALL student_standing(1,@s); -- Good Standing
+select @s;
+
+CALL student_standing(4,@s); -- Needs support
+select @s;
+
+CALL student_standing(9,@s); -- No such student
+select @s;
 
 -- =================================================================
 -- STEP 9. Rebuild add_score so it checks the score
@@ -336,9 +405,30 @@ SELECT * FROM attendance;
 -- Write the DROP. Copy the skeleton and fill the two gaps.
 -- =================================================================
 
--- your comment goes here
--- your statements go here
+-- drop add_score
+drop procedure add_score;
 
+-- adds a score only when it is a real score
+CREATE PROCEDURE add_score(IN p_test_name VARCHAR(20),
+                           IN p_student_id INT,
+                           IN p_score FLOAT)
+BEGIN
+    IF p_score < 0  OR p_score > 100
+    THEN
+        SELECT 'Score must be between 0 and 100' AS message;
+    ELSE
+        INSERT INTO test_scores (test_name, student_id, score)
+        VALUES (p_test_name, p_student_id, p_score);
+
+        UPDATE students
+        SET gpa = calculate_gpa(p_student_id)
+        WHERE student_id = p_student_id;
+    END IF;
+END
+
+CALL add_score("quiz5",4,-20);
+CALL add_score("quiz5",4,120);
+CALL list_students()
 
 -- =================================================================
 -- STEP 10. Rebuild record_attendance so it checks the student
@@ -346,15 +436,31 @@ SELECT * FROM attendance;
 -- Yours from start to finish. The handout walks you through it.
 -- =================================================================
 
--- your comment goes here
--- your statements go here
+CREATE PROCEDURE if not exists record_attendance(IN p_student_id INT,
+                                    IN p_status VARCHAR(10))
+BEGIN
+    DECLARE v_found INT DEFAULT 0;
+    SELECT COUNT(*)
+    INTO v_found
+    FROM students
+    WHERE student_id = p_student_id;
 
+    IF v_found = 0 THEN
+        SELECT "No such student" AS message;
+    ELSE
+        INSERT INTO attendance (student_id, status)
+        VALUES (p_student_id, p_status);
+    END IF;
+END;
+
+CALL record_attendance(9,"present");
+CALL record_attendance(3,"late");
 
 -- =================================================================
 -- STEP 11 and 12. Push to GitHub and submit the URL
 --
 -- Nothing to write here. Follow the handout.
 -- =================================================================
-
++
 -- your comment goes here
 -- your statements go here
